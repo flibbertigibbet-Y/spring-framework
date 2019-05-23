@@ -25,7 +25,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanCreationNotAllowedException;
 import org.springframework.beans.factory.BeanCurrentlyInCreationException;
@@ -172,17 +171,42 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param allowEarlyReference whether early references should be created or not
 	 * @return the registered singleton object, or {@code null} if none found
 	 */
+
+	/**
+	 * singleton的三级缓存 及其用处
+	 * 三级缓存： singletonObjects （创建好，并且完成初始化的bean）
+	 * -> earlySingletonObjects(创建好，但是没完成初始化的bean)
+	 * -> singletonFactories（单例对象的工厂方法的缓存，也是创建好，但是没有完成初始化的bean）
+	 * 当一个bean创建好了以后 还没有完成初始化，就会把自己封装到objectFactory的getObject里，然后放到singletonFactories中
+	 * 其实 单纯就这里而言，只要1，3两级缓存就可以做到功能，为何会有2级缓存，现在暂时不太清楚
+	 */
+
+	/**
+	 * allowEarlyReference 用于规定是否允许提前曝光，这个是用于循环依赖的 如果a依赖于b b依赖于a
+	 * 那么 如果不允许，就会发生死锁。
+	 * 如果允许，那么在a创建的时候 发现依赖于b，则创建b，这个时候b创建，发现依赖于a，如果allowEarlyReference，则b会引用那个未初始化的a
+	 * 然后b创建完成，然后a创建完成，则循环依赖的2个bean都创建好了
+	 */
+
+	/**
+	 * 循环依赖的几种
+	 * 如果 a依赖于b b依赖于a 在单例模式下
+	 * 如果b被放在了a的构造器中（没有默认构造器），则a b循环依赖不能被满足， 报错
+	 * 如果b只是a的一个field，我们通过setter 来对a中的b赋值，则a，b循环依赖可以被满足，不报错
+	 */
+
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 		//已经创建好的bean，会被缓存在singletonObjects里面
-		//如果singletonObjects没有，则表明没有创建
+		//如果singletonObjects没有，则表明还没有创建完成
 		Object singletonObject = this.singletonObjects.get(beanName);
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
-			//如果当前bean正在被创建(在别处正在被创建) -- 表明有人想要创建他，但是到底那个人创建还是没创建 就说不好了
-			//则尝看是否有个不完全版本本创建出来。如果有，则返回不完全版本，如果没有，则自己创建一个不完全版本，然后别人也可以用
-			//由于有锁，则不完全版本的创建过程，只能有一个线程做
-			//一旦不完全版本创建出来了以后，则不循序别人再创建，哪怕不完整版本也不行，所以要从singletonFactories中，将次bean的FactoryBean给去掉
-			//这样别人就不能创建了
+			//如果当前bean正在被创建 -- 表明当前类的bean已经创建出来，只是还没有完成初始化
+			//则试图从二级缓存中获取（earlySingletonObjects）
+			//如果二级缓存中不存在，则从三级缓存中获取，singleFactories中，获取到singletonFactory，然后得到singleton bean
+			//此时的singleton bean也是属于预先创建出来，没有完成初始化的
+			//可以看到 singletonFactory 实在createBeanInstance()之后的 addSingletonFactory（）加入到三级缓存的
+			//从三级缓存拿出以后，则需要加入二级缓存 并且从三级缓存中去除
 			synchronized (this.singletonObjects) {
 				singletonObject = this.earlySingletonObjects.get(beanName);
 				if (singletonObject == null && allowEarlyReference) {

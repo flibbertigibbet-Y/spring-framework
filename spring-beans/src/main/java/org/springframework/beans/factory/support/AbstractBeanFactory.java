@@ -260,7 +260,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			//总结一下这个分支干了什么事情
 			/**
 			 * 1.name所对应的beanName，可能对应了一个普通的bean 也可能对应了一个FactoryBean
-			 * 2.getSingleton(name) 可能返回一个 已经被创建好的普通的bean，或者 已经被创建好的FactoryBean 或者
+			 * 2.getSingleton(name) 可能返回一个 已经被创建好的普通的bean，或者 已经被创建好的FactoryBean 或者 一个正在创建的 不完整的bean 或者 一个正在创建的 不完整的FactoryBean
+			 * 3.
 			 */
 		}
 

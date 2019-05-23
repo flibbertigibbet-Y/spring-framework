@@ -243,6 +243,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		Object bean;
 
 		// Eagerly check singleton cache for manually registered singletons.
+		//这里返回的shareInstance 可能是一个创建好的完整的bean (from singletonObjects)
+		//也可能是一个不完全的bean (from earlySingletonObjects)
 		Object sharedInstance = getSingleton(beanName);
 		if (sharedInstance != null && args == null) {
 			if (logger.isTraceEnabled()) {
@@ -255,9 +257,17 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				}
 			}
 			bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+			//总结一下这个分支干了什么事情
+			/**
+			 * 1.name所对应的beanName，可能对应了一个普通的bean 也可能对应了一个FactoryBean
+			 * 2.getSingleton(name) 可能返回一个 已经被创建好的普通的bean，或者 已经被创建好的FactoryBean 或者
+			 */
 		}
 
 		else {
+			//if sharedInstance为null
+			//表明当前bean还没有被创建，同时也没有被正在创建
+
 			// Fail if we're already creating this bean instance:
 			// We're assumably within a circular reference.
 			if (isPrototypeCurrentlyInCreation(beanName)) {
@@ -1655,21 +1665,28 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		// Now we have the bean instance, which may be a normal bean or a FactoryBean.
 		// If it's a FactoryBean, we use it to create a bean instance, unless the
 		// caller actually wants a reference to the factory.
+		// 如果我们需要的是一个普通bean 或者 我们需要的是一个FactoryBean本身，那么可以直接返回了
+		// 这里的问题在于 前面 getBean(“A”) A是name（无&前缀），也就是当前方法的name
+		// A则可能是一个普通bean， 那么直接返回，没问题
+		// 同时 A也可能是一个FactoryBean的名称，因为没有&前缀,则表明要获取的是这个FactoryBean getObject方法产生的那个东西
 		if (!(beanInstance instanceof FactoryBean) || BeanFactoryUtils.isFactoryDereference(name)) {
 			return beanInstance;
 		}
 
 		Object object = null;
+		// todo为什么要做一个这样的判断 我就是真的不知道了
 		if (mbd == null) {
 			object = getCachedObjectForFactoryBean(beanName);
 		}
 		if (object == null) {
 			// Return bean instance from factory.
+			// 到这里 坐实了他是factorybean的身份，且我们想要的是factorybean下的getObject产生的bean
 			FactoryBean<?> factory = (FactoryBean<?>) beanInstance;
 			// Caches object obtained from FactoryBean if it is a singleton.
 			if (mbd == null && containsBeanDefinition(beanName)) {
 				mbd = getMergedLocalBeanDefinition(beanName);
 			}
+			//synthetic貌似是判断 当前类是不是组合的，也就是说有没有继承之类的关系在
 			boolean synthetic = (mbd != null && mbd.isSynthetic());
 			object = getObjectFromFactoryBean(factory, beanName, !synthetic);
 		}

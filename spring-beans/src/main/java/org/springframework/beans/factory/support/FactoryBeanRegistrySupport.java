@@ -94,13 +94,19 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 	 * @see org.springframework.beans.factory.FactoryBean#getObject()
 	 */
 	protected Object getObjectFromFactoryBean(FactoryBean<?> factory, String beanName, boolean shouldPostProcess) {
+		//从doGetBean的if 到getObjectForBeanInstance 到这里
+		//此时要处理的是 实锤是一个factorybean 并且 要获取这个factorybean下的object
+		//当然 因为getSingleton的缘故，这个factorybean可能是一个还没有完全装配好的，也就是没有完全初始化的 也可能是已经初始化好了的
 		if (factory.isSingleton() && containsSingleton(beanName)) {
 			synchronized (getSingletonMutex()) {
+				//如果当前factoryBean是已经初始化好得
 				Object object = this.factoryBeanObjectCache.get(beanName);
 				if (object == null) {
+					//下面的方法，在factory是初始化完全的情况下 直接返回getObject的内容
 					object = doGetObjectFromFactoryBean(factory, beanName);
 					// Only post-process and store if not put there already during getObject() call above
 					// (e.g. because of circular reference processing triggered by custom getBean calls)
+					// 因为是singleton 模式， 所以 如果多创建了，也不能返回，只能返回最初的一个
 					Object alreadyThere = this.factoryBeanObjectCache.get(beanName);
 					if (alreadyThere != null) {
 						object = alreadyThere;
@@ -132,6 +138,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 			}
 		}
 		else {
+			// 到这里 可能factory不是singleton 也可能是factory没有初始化好
 			Object object = doGetObjectFromFactoryBean(factory, beanName);
 			if (shouldPostProcess) {
 				try {
@@ -180,6 +187,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 
 		// Do not accept a null value for a FactoryBean that's not fully
 		// initialized yet: Many FactoryBeans just return null then.
+		// factory可能是没有初始化好的，没有初始化好的情况下，则直接返回null
 		if (object == null) {
 			if (isSingletonCurrentlyInCreation(beanName)) {
 				throw new BeanCurrentlyInCreationException(

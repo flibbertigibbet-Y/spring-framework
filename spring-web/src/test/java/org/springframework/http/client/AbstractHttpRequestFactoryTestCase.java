@@ -17,6 +17,7 @@
 package org.springframework.http.client;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 
@@ -32,6 +33,9 @@ import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.StreamUtils;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -69,12 +73,8 @@ public abstract class AbstractHttpRequestFactoryTestCase extends AbstractMockWeb
 		assertEquals("Invalid HTTP method", HttpMethod.GET, request.getMethod());
 		assertEquals("Invalid HTTP URI", uri, request.getURI());
 
-		ClientHttpResponse response = request.execute();
-		try {
+		try (ClientHttpResponse response = request.execute()) {
 			assertEquals("Invalid status code", HttpStatus.NOT_FOUND, response.getStatusCode());
-		}
-		finally {
-			response.close();
 		}
 	}
 
@@ -88,7 +88,7 @@ public abstract class AbstractHttpRequestFactoryTestCase extends AbstractMockWeb
 		request.getHeaders().add(headerName, headerValue1);
 		String headerValue2 = "value2";
 		request.getHeaders().add(headerName, headerValue2);
-		final byte[] body = "Hello World".getBytes("UTF-8");
+		final byte[] body = "Hello World".getBytes(StandardCharsets.UTF_8);
 		request.getHeaders().setContentLength(body.length);
 
 		if (request instanceof StreamingHttpOutputMessage) {
@@ -99,25 +99,21 @@ public abstract class AbstractHttpRequestFactoryTestCase extends AbstractMockWeb
 			StreamUtils.copy(body, request.getBody());
 		}
 
-		ClientHttpResponse response = request.execute();
-		try {
+		try (ClientHttpResponse response = request.execute()) {
 			assertEquals("Invalid status code", HttpStatus.OK, response.getStatusCode());
 			assertTrue("Header not found", response.getHeaders().containsKey(headerName));
 			assertEquals("Header value not found", Arrays.asList(headerValue1, headerValue2),
 					response.getHeaders().get(headerName));
 			byte[] result = FileCopyUtils.copyToByteArray(response.getBody());
-			assertTrue("Invalid body", Arrays.equals(body, result));
-		}
-		finally {
-			response.close();
+			assertArrayEquals("Invalid body", body, result);
 		}
 	}
 
-	@Test(expected = IllegalStateException.class)
+	@Test
 	public void multipleWrites() throws Exception {
 		ClientHttpRequest request = factory.createRequest(new URI(baseUrl + "/echo"), HttpMethod.POST);
 
-		final byte[] body = "Hello World".getBytes("UTF-8");
+		final byte[] body = "Hello World".getBytes(StandardCharsets.UTF_8);
 		if (request instanceof StreamingHttpOutputMessage) {
 			StreamingHttpOutputMessage streamingRequest = (StreamingHttpOutputMessage) request;
 			streamingRequest.setBody(outputStream -> {
@@ -131,24 +127,23 @@ public abstract class AbstractHttpRequestFactoryTestCase extends AbstractMockWeb
 		}
 
 		request.execute();
-		FileCopyUtils.copy(body, request.getBody());
+		assertThatIllegalStateException().isThrownBy(() ->
+				FileCopyUtils.copy(body, request.getBody()));
 	}
 
-	@Test(expected = UnsupportedOperationException.class)
+	@Test
+	@SuppressWarnings("try")
 	public void headersAfterExecute() throws Exception {
 		ClientHttpRequest request = factory.createRequest(new URI(baseUrl + "/status/ok"), HttpMethod.POST);
 
 		request.getHeaders().add("MyHeader", "value");
-		byte[] body = "Hello World".getBytes("UTF-8");
-		FileCopyUtils.copy(body, request.getBody());
-
-		ClientHttpResponse response = request.execute();
-		try {
-			request.getHeaders().add("MyHeader", "value");
-		}
-		finally {
-			response.close();
-		}
+		byte[] body = "Hello World".getBytes(StandardCharsets.UTF_8);
+		assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> {
+				FileCopyUtils.copy(body, request.getBody());
+				try (ClientHttpResponse response = request.execute()) {
+					request.getHeaders().add("MyHeader", "value");
+				}
+		});
 	}
 
 	@Test
@@ -190,12 +185,8 @@ public abstract class AbstractHttpRequestFactoryTestCase extends AbstractMockWeb
 		URI uri = new URI(baseUrl + "/params?param1=value&param2=value1&param2=value2");
 		ClientHttpRequest request = factory.createRequest(uri, HttpMethod.GET);
 
-		ClientHttpResponse response = request.execute();
-		try {
+		try (ClientHttpResponse response = request.execute()) {
 			assertEquals("Invalid status code", HttpStatus.OK, response.getStatusCode());
-		}
-		finally {
-			response.close();
 		}
 	}
 

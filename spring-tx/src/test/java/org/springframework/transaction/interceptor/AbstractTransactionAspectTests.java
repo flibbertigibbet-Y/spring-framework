@@ -34,6 +34,7 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.interceptor.TransactionAspectSupport.TransactionInfo;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -47,31 +48,31 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 /**
- * Mock object based tests for transaction aspects.
- * True unit test in that it tests how the transaction aspect uses
- * the PlatformTransactionManager helper, rather than indirectly
- * testing the helper implementation.
+ * Mock object based tests for transaction aspects. A true unit test in that it
+ * tests how the transaction aspect uses the PlatformTransactionManager helper,
+ * rather than indirectly testing the helper implementation.
  *
- * This is a superclass to allow testing both the AOP Alliance MethodInterceptor
+ * <p>This is a superclass to allow testing both the AOP Alliance MethodInterceptor
  * and the AspectJ aspect.
  *
  * @author Rod Johnson
+ * @author Juergen Hoeller
  * @since 16.03.2003
  */
 public abstract class AbstractTransactionAspectTests {
-
-	protected Method exceptionalMethod;
 
 	protected Method getNameMethod;
 
 	protected Method setNameMethod;
 
+	protected Method exceptionalMethod;
+
 
 	@Before
 	public void setup() throws Exception {
-		exceptionalMethod = ITestBean.class.getMethod("exceptional", Throwable.class);
 		getNameMethod = ITestBean.class.getMethod("getName");
 		setNameMethod = ITestBean.class.getMethod("setName", String.class);
+		exceptionalMethod = ITestBean.class.getMethod("exceptional", Throwable.class);
 	}
 
 
@@ -157,13 +158,8 @@ public abstract class AbstractTransactionAspectTests {
 		ITestBean itb = (ITestBean) advised(tb, ptm, tas);
 
 		checkTransactionStatus(false);
-		try {
-			itb.exceptional(new OptimisticLockingFailureException(""));
-			fail("Should have thrown OptimisticLockingFailureException");
-		}
-		catch (OptimisticLockingFailureException ex) {
-			// expected
-		}
+		assertThatExceptionOfType(OptimisticLockingFailureException.class).isThrownBy(() ->
+				itb.exceptional(new OptimisticLockingFailureException("")));
 		checkTransactionStatus(false);
 
 		assertSame(txatt, ptm.getDefinition());

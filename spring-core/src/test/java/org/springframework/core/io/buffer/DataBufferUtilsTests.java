@@ -49,7 +49,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.support.DataBufferTestUtils;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isA;
@@ -489,17 +488,17 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 
 		DataBufferUtils.write(sourceFlux, channel)
 				.subscribe(DataBufferUtils.releaseConsumer(),
-						throwable -> fail(throwable.getMessage()),
+						throwable -> {
+							throw new AssertionError(throwable.getMessage(), throwable);
+						},
 						() -> {
 							try {
 								String expected = String.join("", Files.readAllLines(source));
 								String result = String.join("", Files.readAllLines(destination));
-
 								assertEquals(expected, result);
-
 							}
 							catch (IOException e) {
-								fail(e.getMessage());
+								throw new AssertionError(e.getMessage(), e);
 							}
 							finally {
 								DataBufferUtils.closeChannel(channel);
@@ -523,7 +522,9 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 
 		DataBufferUtils.write(sourceFlux, channel)
 				.subscribe(DataBufferUtils::release,
-						throwable -> fail(throwable.getMessage()),
+						throwable -> {
+							throw new AssertionError(throwable.getMessage(), throwable);
+						},
 						() -> {
 							try {
 								String expected = String.join("", Files.readAllLines(source));
@@ -534,7 +535,7 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 
 							}
 							catch (IOException e) {
-								fail(e.getMessage());
+								throw new AssertionError(e.getMessage(), e);
 							}
 							finally {
 								DataBufferUtils.closeChannel(channel);
@@ -817,6 +818,25 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 				.consumeNextWith(stringConsumer("foo--"))
 				.consumeNextWith(stringConsumer("bar--"))
 				.consumeNextWith(stringConsumer("baz--"))
+				.verifyComplete();
+	}
+
+	@Test
+	public void splitMultipleDelimiters() {
+		Mono<DataBuffer> source =
+				deferStringBuffer("foo␤bar␍␤baz␤");
+
+		byte[][] delimiters = new byte[][]{
+				"␤".getBytes(StandardCharsets.UTF_8),
+				"␍␤".getBytes(StandardCharsets.UTF_8)
+		};
+
+		Flux<DataBuffer> result = DataBufferUtils.split(source, delimiters, false);
+
+		StepVerifier.create(result)
+				.consumeNextWith(stringConsumer("foo␤"))
+				.consumeNextWith(stringConsumer("bar␍␤"))
+				.consumeNextWith(stringConsumer("baz␤"))
 				.verifyComplete();
 	}
 

@@ -34,11 +34,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import org.hamcrest.Matchers;
 import org.junit.Test;
 
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.emptyCollectionOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -58,6 +62,21 @@ public class HttpHeadersTests {
 
 	private final HttpHeaders headers = new HttpHeaders();
 
+
+	@Test
+	public void getOrEmpty() {
+		String key = "FOO";
+
+		assertThat(headers.get(key), is(nullValue()));
+		assertThat(headers.getOrEmpty(key), is(empty()));
+
+		headers.add(key, "bar");
+		assertThat(headers.getOrEmpty(key), is(Arrays.asList("bar")));
+
+		headers.remove(key);
+		assertThat(headers.get(key), is(nullValue()));
+		assertThat(headers.getOrEmpty(key), is(empty()));
+	}
 
 	@Test
 	public void getFirst() {
@@ -178,12 +197,10 @@ public class HttpHeadersTests {
 		assertEquals("Invalid Host header", "[::1]", headers.getFirst("Host"));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void illegalETag() {
 		String eTag = "v2.6";
-		headers.setETag(eTag);
-		assertEquals("Invalid ETag header", eTag, headers.getETag());
-		assertEquals("Invalid ETag header", "\"v2.6\"", headers.getFirst("ETag"));
+		assertThatIllegalArgumentException().isThrownBy(() -> headers.setETag(eTag));
 	}
 
 	@Test
@@ -194,10 +211,10 @@ public class HttpHeadersTests {
 		assertEquals("Invalid If-Match header", "\"v2.6\"", headers.getFirst("If-Match"));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void ifMatchIllegalHeader() {
 		headers.setIfMatch("Illegal");
-		headers.getIfMatch();
+		assertThatIllegalArgumentException().isThrownBy(headers::getIfMatch);
 	}
 
 	@Test
@@ -206,7 +223,7 @@ public class HttpHeadersTests {
 		headers.add(HttpHeaders.IF_MATCH, "W/\"v2,1\", \"v2,2\"");
 		assertEquals("Invalid If-Match header", "\"v2,0\"", headers.get(HttpHeaders.IF_MATCH).get(0));
 		assertEquals("Invalid If-Match header", "W/\"v2,1\", \"v2,2\"", headers.get(HttpHeaders.IF_MATCH).get(1));
-		assertThat(headers.getIfMatch(), Matchers.contains("\"v2,0\"", "W/\"v2,1\"", "\"v2,2\""));
+		assertThat(headers.getIfMatch(), contains("\"v2,0\"", "W/\"v2,1\"", "\"v2,2\""));
 	}
 
 	@Test
@@ -233,7 +250,7 @@ public class HttpHeadersTests {
 		ifNoneMatchList.add(ifNoneMatch1);
 		ifNoneMatchList.add(ifNoneMatch2);
 		headers.setIfNoneMatch(ifNoneMatchList);
-		assertThat(headers.getIfNoneMatch(), Matchers.contains("\"v2.6\"", "\"v2.7\"", "\"v2.8\""));
+		assertThat(headers.getIfNoneMatch(), contains("\"v2.6\"", "\"v2.7\"", "\"v2.8\""));
 		assertEquals("Invalid If-None-Match header", "\"v2.6\", \"v2.7\", \"v2.8\"", headers.getFirst("If-None-Match"));
 	}
 
@@ -251,10 +268,10 @@ public class HttpHeadersTests {
 		assertEquals("Invalid Date header", date, headers.getDate());
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void dateInvalid() {
 		headers.set("Date", "Foo Bar Baz");
-		headers.getDate();
+		assertThatIllegalArgumentException().isThrownBy(headers::getDate);
 	}
 
 	@Test
@@ -382,7 +399,7 @@ public class HttpHeadersTests {
 	@Test  // SPR-11917
 	public void getAllowEmptySet() {
 		headers.setAllow(Collections.emptySet());
-		assertThat(headers.getAllow(), Matchers.emptyCollectionOf(HttpMethod.class));
+		assertThat(headers.getAllow(), is(emptyCollectionOf(HttpMethod.class)));
 	}
 
 	@Test
@@ -397,7 +414,7 @@ public class HttpHeadersTests {
 	@Test
 	public void accessControlAllowHeaders() {
 		List<String> allowedHeaders = headers.getAccessControlAllowHeaders();
-		assertThat(allowedHeaders, Matchers.emptyCollectionOf(String.class));
+		assertThat(allowedHeaders, is(emptyCollectionOf(String.class)));
 		headers.setAccessControlAllowHeaders(Arrays.asList("header1", "header2"));
 		allowedHeaders = headers.getAccessControlAllowHeaders();
 		assertEquals(allowedHeaders, Arrays.asList("header1", "header2"));
@@ -406,7 +423,7 @@ public class HttpHeadersTests {
 	@Test
 	public void accessControlAllowHeadersMultipleValues() {
 		List<String> allowedHeaders = headers.getAccessControlAllowHeaders();
-		assertThat(allowedHeaders, Matchers.emptyCollectionOf(String.class));
+		assertThat(allowedHeaders, is(emptyCollectionOf(String.class)));
 		headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "header1, header2");
 		headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "header3");
 		allowedHeaders = headers.getAccessControlAllowHeaders();
@@ -416,7 +433,7 @@ public class HttpHeadersTests {
 	@Test
 	public void accessControlAllowMethods() {
 		List<HttpMethod> allowedMethods = headers.getAccessControlAllowMethods();
-		assertThat(allowedMethods, Matchers.emptyCollectionOf(HttpMethod.class));
+		assertThat(allowedMethods, is(emptyCollectionOf(HttpMethod.class)));
 		headers.setAccessControlAllowMethods(Arrays.asList(HttpMethod.GET, HttpMethod.POST));
 		allowedMethods = headers.getAccessControlAllowMethods();
 		assertEquals(allowedMethods, Arrays.asList(HttpMethod.GET, HttpMethod.POST));
@@ -432,7 +449,7 @@ public class HttpHeadersTests {
 	@Test
 	public void accessControlExposeHeaders() {
 		List<String> exposedHeaders = headers.getAccessControlExposeHeaders();
-		assertThat(exposedHeaders, Matchers.emptyCollectionOf(String.class));
+		assertThat(exposedHeaders, is(emptyCollectionOf(String.class)));
 		headers.setAccessControlExposeHeaders(Arrays.asList("header1", "header2"));
 		exposedHeaders = headers.getAccessControlExposeHeaders();
 		assertEquals(exposedHeaders, Arrays.asList("header1", "header2"));
@@ -448,7 +465,7 @@ public class HttpHeadersTests {
 	@Test
 	public void accessControlRequestHeaders() {
 		List<String> requestHeaders = headers.getAccessControlRequestHeaders();
-		assertThat(requestHeaders, Matchers.emptyCollectionOf(String.class));
+		assertThat(requestHeaders, is(emptyCollectionOf(String.class)));
 		headers.setAccessControlRequestHeaders(Arrays.asList("header1", "header2"));
 		requestHeaders = headers.getAccessControlRequestHeaders();
 		assertEquals(requestHeaders, Arrays.asList("header1", "header2"));
@@ -549,11 +566,11 @@ public class HttpHeadersTests {
 		assertEquals("foo:bar", new String(result, StandardCharsets.ISO_8859_1));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void basicAuthIllegalChar() {
 		String username = "foo";
 		String password = "\u03BB";
-		headers.setBasicAuth(username, password);
+		assertThatIllegalArgumentException().isThrownBy(() -> headers.setBasicAuth(username, password));
 	}
 
 	@Test

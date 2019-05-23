@@ -22,6 +22,7 @@ import org.junit.Test;
 
 import org.springframework.core.env.StandardEnvironment;
 
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -36,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 public class ResourceEditorTests {
 
 	@Test
-	public void sunnyDay() throws Exception {
+	public void sunnyDay() {
 		PropertyEditor editor = new ResourceEditor();
 		editor.setAsText("classpath:org/springframework/core/io/ResourceEditorTests.class");
 		Resource resource = (Resource) editor.getValue();
@@ -44,20 +45,21 @@ public class ResourceEditorTests {
 		assertTrue(resource.exists());
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void ctorWithNullCtorArgs() throws Exception {
-		new ResourceEditor(null, null);
+	@Test
+	public void ctorWithNullCtorArgs() {
+		assertThatIllegalArgumentException().isThrownBy(() ->
+				new ResourceEditor(null, null));
 	}
 
 	@Test
-	public void setAndGetAsTextWithNull() throws Exception {
+	public void setAndGetAsTextWithNull() {
 		PropertyEditor editor = new ResourceEditor();
 		editor.setAsText(null);
 		assertEquals("", editor.getAsText());
 	}
 
 	@Test
-	public void setAndGetAsTextWithWhitespaceResource() throws Exception {
+	public void setAndGetAsTextWithWhitespaceResource() {
 		PropertyEditor editor = new ResourceEditor();
 		editor.setAsText("  ");
 		assertEquals("", editor.getAsText());
@@ -65,6 +67,20 @@ public class ResourceEditorTests {
 
 	@Test
 	public void testSystemPropertyReplacement() {
+		PropertyEditor editor = new ResourceEditor();
+		System.setProperty("test.prop", "foo");
+		try {
+			editor.setAsText("${test.prop}");
+			Resource resolved = (Resource) editor.getValue();
+			assertEquals("foo", resolved.getFilename());
+		}
+		finally {
+			System.getProperties().remove("test.prop");
+		}
+	}
+
+	@Test
+	public void testSystemPropertyReplacementWithUnresolvablePlaceholder() {
 		PropertyEditor editor = new ResourceEditor();
 		System.setProperty("test.prop", "foo");
 		try {
@@ -77,14 +93,15 @@ public class ResourceEditorTests {
 		}
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void testStrictSystemPropertyReplacement() {
+	@Test
+	public void testStrictSystemPropertyReplacementWithUnresolvablePlaceholder() {
 		PropertyEditor editor = new ResourceEditor(new DefaultResourceLoader(), new StandardEnvironment(), false);
 		System.setProperty("test.prop", "foo");
 		try {
-			editor.setAsText("${test.prop}-${bar}");
-			Resource resolved = (Resource) editor.getValue();
-			assertEquals("foo-${bar}", resolved.getFilename());
+			assertThatIllegalArgumentException().isThrownBy(() -> {
+					editor.setAsText("${test.prop}-${bar}");
+					editor.getValue();
+			});
 		}
 		finally {
 			System.getProperties().remove("test.prop");
